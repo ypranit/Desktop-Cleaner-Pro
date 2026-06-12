@@ -361,30 +361,157 @@ def to_csv(rows, fieldnames):
     writer.writerows(rows)
     return buffer.getvalue()
 
-
 def get_suggestions(stats):
     suggestions = []
 
     if stats["shortcuts"] > 0:
-        suggestions.append(f"Move {stats['shortcuts']} shortcuts into a Shortcuts folder.")
+        suggestions.append(
+            f"Move {stats['shortcuts']} shortcuts into a Shortcuts folder."
+        )
+
     if stats["images"] > 10:
-        suggestions.append("You have many images. Auto-archive them into Images.")
+        suggestions.append(
+            "You have many images. Auto-archive them into Images."
+        )
+
     if stats["documents"] > 10:
-        suggestions.append("Documents are piling up. Sort PDFs and docs into Documents.")
+        suggestions.append(
+            "Documents are piling up. Sort PDFs and docs into Documents."
+        )
+
     if stats["code"] > 0:
-        suggestions.append("Code files detected. Keep them inside a Projects folder, not on the Desktop.")
+        suggestions.append(
+            "Code files detected. Keep them inside a Projects folder, not on the Desktop."
+        )
+
     if stats["archives"] > 0:
-        suggestions.append("Archive files found. Move them into Archives.")
+        suggestions.append(
+            "Archive files found. Move them into Archives."
+        )
+
     if stats["large_files"] > 0:
-        suggestions.append("Large files detected. Review them before moving.")
+        suggestions.append(
+            "Large files detected. Review them before moving."
+        )
+
     if stats["folders"] > 8:
-        suggestions.append("A lot of folders are on the Desktop. Consider moving older folders into Archive.")
+        suggestions.append(
+            "A lot of folders are on the Desktop. Consider moving older folders into Archive."
+        )
+
     if not suggestions:
-        suggestions.append("Desktop looks pretty clean. Nice job.")
+        suggestions.append(
+            "Desktop looks pretty clean. Nice job."
+        )
 
     return suggestions
 
+def get_old_files(entries, days=90):
+    old_files = []
 
+    cutoff = datetime.now().timestamp() - (days * 24 * 60 * 60)
+
+    for file in entries:
+        try:
+            modified_time = datetime.strptime(
+                file["Modified"],
+                "%Y-%m-%d %H:%M"
+            ).timestamp()
+
+            if modified_time < cutoff:
+                old_files.append(file)
+
+        except Exception:
+            continue
+
+    return old_files
+
+def get_extension_counts(entries):
+    counts = {}
+
+    for file in entries:
+        if file["Type"] != "File":
+            continue
+
+        extension = Path(file["Name"]).suffix.lower()
+
+        if extension == "":
+            extension = "No Extension"
+
+        counts[extension] = counts.get(extension, 0) + 1
+
+    return counts
+
+def get_folder_sizes(scan_root):
+    folders = []
+
+    for item in scan_root.iterdir():
+
+        if item.is_dir():
+
+            total_size = 0
+
+            try:
+                for file in item.rglob("*"):
+
+                    if file.is_file():
+
+                        total_size += file.stat().st_size
+
+            except:
+                pass
+
+            folders.append(
+                {
+                    "Folder": item.name,
+                    "Size MB": round(total_size / (1024 * 1024), 2)
+                }
+            )
+
+    folders.sort(
+        key=lambda x: x["Size MB"],
+        reverse=True
+    )
+
+    return folders
+    
+def get_desktop_health(stats, old_files_count):
+
+    score = (
+        stats["large_files"]
+        + old_files_count
+        + stats["folders"]
+    )
+
+    if score <= 10:
+        return "🟢 Healthy Desktop"
+
+    elif score <= 20:
+        return "🟡 Moderate Clutter"
+
+    else:
+        return "🔴 Needs Cleanup"
+
+def get_duplicates(entries):
+
+    duplicates = {}
+
+    for file in entries:
+
+        name = file["Name"]
+
+        if name not in duplicates:
+            duplicates[name] = []
+
+        duplicates[name].append(file)
+
+    duplicates = {
+        name: files
+        for name, files in duplicates.items()
+        if len(files) > 1
+    }
+
+    return duplicates
 # ----------------------------
 # Session State
 # ----------------------------
@@ -408,14 +535,19 @@ if "last_action" not in st.session_state:
 # Hero
 # ----------------------------
 st.markdown(
-    """
-    <div class="hero">
-        <h1>🧹 Smart Desktop Cleaner Pro</h1>
-        <p>Bright dashboard • Fast scan • Safe preview • One-click organization</p>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+        """
+        <div class="hero">
+        <h1>🧹 Desktop Cleaner Pro</h1>
+
+    <p>
+    Safe Preview Architecture
+    <br>
+    Fast • Smart • Organized
+    </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # ----------------------------
 # Sidebar
@@ -434,29 +566,33 @@ safe_mode = st.sidebar.toggle("Preview only (safe mode)", value=True)
 show_hidden = st.sidebar.toggle("Show hidden files", value=False)
 rows_to_show = st.sidebar.slider("Rows to display", min_value=5, max_value=50, value=15, step=5)
 
-st.sidebar.markdown(
-    """
-### Features
+st.sidebar.markdown("""
+## 🚀 Smart Desktop Cleaner Pro
 
-🔍 Desktop Scanner  
-📂 Auto Organization  
-🖼 Image Detection  
-📄 Document Sorting  
-💻 Code File Detection  
-📦 Archive Detection  
-🎧 Audio / 🎬 Video Sorting  
-⬇ Downloadable Report  
+### ✅ Features
+
+🔍 Scanner
+
+👀 Safe Preview
+
+📂 Auto Organization
+
+📈 Analytics
+
+🕒 Old Files
+
+🔍 Search Files
+
+📁 Folder Sizes
+
+📄 CSV Reports
 
 ---
 
-### Upcoming
+### 🏷 Version
 
-🤖 AI Suggestions  
-☁ Cloud Sync  
-📊 Analytics  
-⚡ Automation Rules  
-"""
-)
+v1.3
+""")
 
 # ----------------------------
 # Path Validation
@@ -521,7 +657,7 @@ if scan_clicked or preview_clicked or organize_clicked:
 if st.session_state.scan_stats:
     stats = st.session_state.scan_stats
 
-    st.markdown("# 2. Desktop Snapshot")
+    st.markdown("# 📊 Desktop Analytics")
 
     r1, r2, r3, r4, r5 = st.columns(5)
     with r1:
@@ -545,7 +681,20 @@ if st.session_state.scan_stats:
     with r9:
         st.metric("Archives", stats["archives"])
 
-    st.markdown("# 3. Smart Suggestions")
+    old_files_count = len(
+        get_old_files(st.session_state.scan_entries)
+    )
+
+    health = get_desktop_health(
+        stats,
+        old_files_count
+    )
+
+    st.markdown("# ❤️ Desktop Health")
+
+    st.success(health)
+
+    st.markdown("# 💡 Smart Suggestions")
     suggestions = get_suggestions(stats)
 
     for s in suggestions:
@@ -556,60 +705,116 @@ if st.session_state.scan_stats:
         else:
             st.info(f"💡 {s}")
 
-    st.markdown("# 4. File Preview")
+    st.markdown("# 📈 File Type Analytics")
 
-    if st.session_state.scan_entries:
-        st.dataframe(
-            st.session_state.scan_entries[:rows_to_show],
-            use_container_width=True,
-            hide_index=True,
-        )
+    extension_counts = get_extension_counts(
+        st.session_state.scan_entries
+    )
 
-        csv_data = to_csv(
-            st.session_state.scan_entries,
-            ["Name", "Type", "Category", "Size MB", "Modified", "Path"],
-        )
+    if extension_counts:
+        st.bar_chart(extension_counts)
 
-        st.download_button(
-            "⬇ Download Scan Report CSV",
-            data=csv_data,
-            file_name="desktop_scan_report.csv",
-            mime="text/csv",
-            use_container_width=True,
-        )
-
-        with st.expander("📌 Largest Files"):
-            file_rows = [
-                row for row in st.session_state.scan_entries if row["Type"] == "File"
+        st.table(
+            [
+                {"Extension": ext, "Count": count}
+                for ext, count in sorted(
+                    extension_counts.items(),
+                    key=lambda x: x[1],
+                    reverse=True
+                )
             ]
-            file_rows = sorted(file_rows, key=lambda x: x["Size MB"], reverse=True)[:10]
+        )
 
-            if file_rows:
-                st.table(file_rows)
-            else:
-                st.write("No files found.")
+    st.markdown("# 🕒 Old Files")
 
-    st.markdown("# 5. Cleanup Report")
+    old_files = get_old_files(
+        st.session_state.scan_entries
+    )
 
-    if st.session_state.cleanup_logs:
+    if old_files:
+        st.warning(
+            f"⚠️ Found {len(old_files)} files older than 90 days."
+        )
+
+        with st.expander("🕒 View Old Files"):
+            st.dataframe(
+                old_files,
+                use_container_width=True,
+                hide_index=True
+            )
+
+    else:
+        st.success(
+            "✅ No old files detected."
+        )
+    st.markdown("# 🔍 Search Files")
+
+    search_term = st.text_input(
+        "Search by filename"
+    )
+
+    if search_term:
+
+        results = []
+
+        for file in st.session_state.scan_entries:
+            if search_term.lower() in file["Name"].lower():
+                results.append(file)
+
+        if results:
+            st.success(
+                f"Found {len(results)} matching files."
+            )
+
+            st.dataframe(
+                results,
+                use_container_width=True,
+                hide_index=True
+            )
+
+        else:
+            st.warning(
+                "No matching files found."
+            )
+    st.markdown("# 📁 Folder Size Analysis")
+
+    folder_sizes = get_folder_sizes(scan_root)
+
+    if folder_sizes:
+
         st.dataframe(
-            st.session_state.cleanup_logs[:rows_to_show],
+            folder_sizes[:10],
             use_container_width=True,
-            hide_index=True,
+            hide_index=True
+        )
+    st.markdown("# 📑 Duplicate Files")
+
+    duplicates = get_duplicates(
+        st.session_state.scan_entries
+    )
+
+    if duplicates:
+
+        st.warning(
+            f"Found {len(duplicates)} duplicate filenames."
         )
 
-        log_csv = to_csv(
-            st.session_state.cleanup_logs,
-            ["Item", "Category", "Action", "Destination", "Status"],
-        )
+        for name, files in duplicates.items():
 
-        st.download_button(
-            "⬇ Download Cleanup Log CSV",
-            data=log_csv,
-            file_name="desktop_cleanup_log.csv",
-            mime="text/csv",
-            use_container_width=True,
+            with st.expander(name):
+
+                st.dataframe(
+                    files,
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+    else:
+
+        st.success(
+            "No duplicate filenames found."
         )
+    st.markdown("# 📋 Cleanup Report")
 
 # ----------------------------
 # Footer
@@ -617,7 +822,9 @@ if st.session_state.scan_stats:
 st.markdown(
     f"""
     <div class="footer">
-        Built by Pranit • Smart Desktop Cleaner Pro • {datetime.now().strftime('%Y-%m-%d %H:%M')}
+        Safe Preview Architecture | Python + Streamlit<br>
+        Smart Desktop Cleaner Pro | Version 1.3<br>
+        {datetime.now().strftime('%Y-%m-%d %H:%M')}
     </div>
     """,
     unsafe_allow_html=True,
