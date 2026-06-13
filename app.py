@@ -4,6 +4,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
+import plotly.express as px
 import streamlit as st
 
 # ----------------------------
@@ -474,7 +475,7 @@ def get_folder_sizes(scan_root):
     )
 
     return folders
-    
+
 def get_desktop_health(stats, old_files_count):
 
     score = (
@@ -512,6 +513,31 @@ def get_duplicates(entries):
     }
 
     return duplicates
+
+def get_recent_files(entries, days=7):
+
+    recent_files = []
+
+    cutoff = datetime.now().timestamp() - (
+        days * 24 * 60 * 60
+    )
+
+    for file in entries:
+
+        try:
+            modified_time = datetime.strptime(
+                file["Modified"],
+                "%Y-%m-%d %H:%M"
+            ).timestamp()
+
+            if modified_time >= cutoff:
+                recent_files.append(file)
+
+        except:
+            pass
+
+    return recent_files
+
 # ----------------------------
 # Session State
 # ----------------------------
@@ -565,6 +591,15 @@ output_root_str = st.sidebar.text_input(
 safe_mode = st.sidebar.toggle("Preview only (safe mode)", value=True)
 show_hidden = st.sidebar.toggle("Show hidden files", value=False)
 rows_to_show = st.sidebar.slider("Rows to display", min_value=5, max_value=50, value=15, step=5)
+page = st.sidebar.radio(
+    "Navigation",
+    [
+        "🏠 Dashboard",
+        "📁 Files",
+        "📊 Analytics",
+        "📋 Reports"
+    ]
+)
 
 st.sidebar.markdown("""
 ## 🚀 Smart Desktop Cleaner Pro
@@ -656,165 +691,82 @@ if scan_clicked or preview_clicked or organize_clicked:
 # ----------------------------
 if st.session_state.scan_stats:
     stats = st.session_state.scan_stats
+    if page == "🏠 Dashboard":
 
-    st.markdown("# 📊 Desktop Analytics")
+        st.subheader("📊 Desktop Analytics")
 
-    r1, r2, r3, r4, r5 = st.columns(5)
-    with r1:
-        st.metric("Items", stats["total_items"])
-    with r2:
-        st.metric("Files", stats["files"])
-    with r3:
-        st.metric("Folders", stats["folders"])
-    with r4:
-        st.metric("Shortcuts", stats["shortcuts"])
-    with r5:
-        st.metric("Large Files", stats["large_files"])
+        r1, r2, r3, r4, r5 = st.columns(5)
 
-    r6, r7, r8, r9 = st.columns(4)
-    with r6:
-        st.metric("Images", stats["images"])
-    with r7:
-        st.metric("Documents", stats["documents"])
-    with r8:
-        st.metric("Code Files", stats["code"])
-    with r9:
-        st.metric("Archives", stats["archives"])
+        with r1:
+            st.metric("Items", stats["total_items"])
 
-    old_files_count = len(
-        get_old_files(st.session_state.scan_entries)
-    )
+        with r2:
+            st.metric("Files", stats["files"])
 
-    health = get_desktop_health(
-        stats,
-        old_files_count
-    )
+        with r3:
+            st.metric("Folders", stats["folders"])
 
-    st.markdown("# ❤️ Desktop Health")
+        with r4:
+            st.metric("Shortcuts", stats["shortcuts"])
 
-    st.success(health)
+        with r5:
+            st.metric("Large Files", stats["large_files"])
+    elif page == "📁 Files":
 
-    st.markdown("# 💡 Smart Suggestions")
-    suggestions = get_suggestions(stats)
+        st.subheader("🕒 Old Files")
 
-    for s in suggestions:
-        if "clean" in s.lower():
-            st.success(f"✅ {s}")
-        elif "many" in s.lower() or "large" in s.lower() or "piling up" in s.lower():
-            st.warning(f"⚠️ {s}")
-        else:
-            st.info(f"💡 {s}")
-
-    st.markdown("# 📈 File Type Analytics")
-
-    extension_counts = get_extension_counts(
-        st.session_state.scan_entries
-    )
-
-    if extension_counts:
-        st.bar_chart(extension_counts)
-
-        st.table(
-            [
-                {"Extension": ext, "Count": count}
-                for ext, count in sorted(
-                    extension_counts.items(),
-                    key=lambda x: x[1],
-                    reverse=True
-                )
-            ]
+        old_files = get_old_files(
+            st.session_state.scan_entries
         )
 
-    st.markdown("# 🕒 Old Files")
+        if old_files:
+            st.warning(
+                f"Found {len(old_files)} files older than 90 days."
+            )
 
-    old_files = get_old_files(
-        st.session_state.scan_entries
-    )
-
-    if old_files:
-        st.warning(
-            f"⚠️ Found {len(old_files)} files older than 90 days."
-        )
-
-        with st.expander("🕒 View Old Files"):
             st.dataframe(
                 old_files,
                 use_container_width=True,
                 hide_index=True
             )
+    elif page == "📊 Analytics":
 
-    else:
-        st.success(
-            "✅ No old files detected."
+        st.subheader("📈 File Type Analytics")
+
+        extension_counts = get_extension_counts(
+            st.session_state.scan_entries
         )
-    st.markdown("# 🔍 Search Files")
 
-    search_term = st.text_input(
-        "Search by filename"
-    )
+        if extension_counts:
 
-    if search_term:
+            chart_data = {
+                "Extension": list(extension_counts.keys()),
+                "Count": list(extension_counts.values())
+            }
 
-        results = []
-
-        for file in st.session_state.scan_entries:
-            if search_term.lower() in file["Name"].lower():
-                results.append(file)
-
-        if results:
-            st.success(
-                f"Found {len(results)} matching files."
+            fig = px.pie(
+                chart_data,
+                names="Extension",
+                values="Count",
+                hole=0.6
             )
 
+            st.plotly_chart(
+                fig,
+                use_container_width=True
+            )
+
+    elif page == "📋 Reports":
+
+        st.subheader("📋 Cleanup Report")
+
+        if st.session_state.cleanup_logs:
+
             st.dataframe(
-                results,
+                st.session_state.cleanup_logs,
                 use_container_width=True,
                 hide_index=True
             )
-
-        else:
-            st.warning(
-                "No matching files found."
-            )
-    st.markdown("# 📁 Folder Size Analysis")
-
-    folder_sizes = get_folder_sizes(scan_root)
-
-    if folder_sizes:
-
-        st.dataframe(
-            folder_sizes[:10],
-            use_container_width=True,
-            hide_index=True
-        )
-    st.markdown("# 📑 Duplicate Files")
-
-    duplicates = get_duplicates(
-        st.session_state.scan_entries
-    )
-
-    if duplicates:
-
-        st.warning(
-            f"Found {len(duplicates)} duplicate filenames."
-        )
-
-        for name, files in duplicates.items():
-
-            with st.expander(name):
-
-                st.dataframe(
-                    files,
-                    use_container_width=True,
-                    hide_index=True
-                )
-
-    else:
-
-        st.success(
-            "No duplicate filenames found."
-        )
-    st.markdown("# 📋 Cleanup Report")
 
 # ----------------------------
 # Footer
