@@ -626,7 +626,7 @@ st.sidebar.markdown("""
 
 ### 🏷 Version
 
-v1.3
+v2.0
 """)
 
 # ----------------------------
@@ -711,7 +711,41 @@ if st.session_state.scan_stats:
 
         with r5:
             st.metric("Large Files", stats["large_files"])
-    elif page == "📁 Files":
+        old_files_count = len(
+            get_old_files(
+                st.session_state.scan_entries
+            )
+        )
+
+        health = get_desktop_health(
+            stats,
+            old_files_count
+        )
+
+        st.subheader("❤️ Desktop Health")
+
+        st.success(health)
+
+        st.subheader("💡 Smart Suggestions")
+
+        suggestions = get_suggestions(stats)
+
+        for s in suggestions:
+            st.info(s)
+
+        st.subheader("🕒 Recent Files")
+
+        recent_files = get_recent_files(
+            st.session_state.scan_entries
+        )
+
+        if recent_files:
+            st.dataframe(
+                recent_files[:10],
+                use_container_width=True,
+                hide_index=True
+            )
+     elif page == "📁 Files":
 
         st.subheader("🕒 Old Files")
 
@@ -720,14 +754,39 @@ if st.session_state.scan_stats:
         )
 
         if old_files:
-            st.warning(
-                f"Found {len(old_files)} files older than 90 days."
-            )
 
             st.dataframe(
                 old_files,
                 use_container_width=True,
                 hide_index=True
+            )
+
+        st.subheader("📁 Folder Size Analysis")
+
+        folder_sizes = get_folder_sizes(
+            scan_root
+        )
+
+        if folder_sizes:
+
+            st.dataframe(
+                folder_sizes,
+                use_container_width=True,
+                hide_index=True
+            )
+
+        st.subheader("📑 Duplicate Files")
+
+        duplicates = get_duplicates(
+            st.session_state.scan_entries
+        )
+
+    if duplicates:
+
+        for name, files in duplicates.items():
+
+            st.warning(
+                f"{name} appears {len(files)} times."
             )
     elif page == "📊 Analytics":
 
@@ -755,7 +814,11 @@ if st.session_state.scan_stats:
                 fig,
                 use_container_width=True
             )
-
+            st.dataframe(
+                chart_data,
+                use_container_width=True,
+                hide_index=True
+            )
     elif page == "📋 Reports":
 
         st.subheader("📋 Cleanup Report")
