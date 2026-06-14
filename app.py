@@ -151,16 +151,15 @@ VIDEO_EXTS = {".mp4", ".mov", ".mkv", ".avi"}
 # Helpers
 # ----------------------------
 def detect_desktop_path() -> Path:
-    candidates = [
-        Path.home() / "Desktop",
-        Path.home() / "OneDrive" / "Desktop",
-        Path(r"C:\Users\Public\Desktop"),
-    ]
-    for c in candidates:
-        if c.exists():
-            return c
-    return candidates[0]
 
+    if (Path.home() / "Desktop").exists():
+        return Path.home() / "Desktop"
+
+    if (Path.home() / "OneDrive" / "Desktop").exists():
+        return Path.home() / "OneDrive" / "Desktop"
+
+    # Streamlit Cloud fallback
+    return Path.cwd()
 
 def is_inside(child: Path, parent: Path) -> bool:
     try:
@@ -783,7 +782,7 @@ if page == "🏠 Dashboard":
         st.success(
             f"{health_status} ({health_score}%)"
         )
-        
+
 elif page == "📁 Files":
 
     st.subheader("📁 Files")
