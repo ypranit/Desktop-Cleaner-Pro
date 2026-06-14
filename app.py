@@ -478,20 +478,21 @@ def get_folder_sizes(scan_root):
 
 def get_desktop_health(stats, old_files_count):
 
-    score = (
-        stats["large_files"]
-        + old_files_count
-        + stats["folders"]
-    )
+    score = 100
 
-    if score <= 10:
-        return "🟢 Healthy Desktop"
+    score -= stats["large_files"] * 10
+    score -= old_files_count * 5
+    score -= stats["folders"] * 2
 
-    elif score <= 20:
-        return "🟡 Moderate Clutter"
+    score = max(score,0)
 
+    if score >= 80:
+        status = "🟢 Healthy Desktop"
+    elif score >= 50:
+        status = "🟡 Moderate Clutter"
     else:
-        return "🔴 Needs Cleanup"
+        status = "🔴 Needs Cleanup"
+    return score, status  
 
 def get_duplicates(entries):
 
@@ -513,6 +514,7 @@ def get_duplicates(entries):
     }
 
     return duplicates
+
 
 def get_recent_files(entries, days=7):
 
@@ -537,6 +539,39 @@ def get_recent_files(entries, days=7):
             pass
 
     return recent_files
+
+def get_largest_files(entries):
+    files = [
+        file for file in entries
+        if file["Type"] == "File"
+    ]
+
+    files.sort(
+        key=lambda x: x["Size MB"],
+        reverse=True
+    )
+
+    return files[:5]
+    
+def glass_card(title, value):
+
+    st.markdown(
+        f"""
+        <div style="
+        background:rgba(15,23,42,0.7);
+        border:1px solid rgba(255,255,255,0.1);
+        border-radius:20px;
+        padding:25px;
+        text-align:center;
+        box-shadow:0px 8px 25px rgba(0,0,0,.3);
+        backdrop-filter: blur(15px);
+        ">
+            <h4>{title}</h4>
+            <h1>{value}</h1>
+        </div>
+        """,
+        unsafe_allow_html=True
+    ) 
 
 # ----------------------------
 # Session State
@@ -689,108 +724,97 @@ if scan_clicked or preview_clicked or organize_clicked:
 # ----------------------------
 # Summary Cards
 # ----------------------------
-if st.session_state.scan_stats:
+# ----------------------------
+# Pages
+# ----------------------------
+
+if page == "🏠 Dashboard":
+
     stats = st.session_state.scan_stats
-    if page == "🏠 Dashboard":
+
+    if stats:
 
         st.subheader("📊 Desktop Analytics")
 
         r1, r2, r3, r4, r5 = st.columns(5)
 
         with r1:
-            st.metric("Items", stats["total_items"])
+            glass_card("Files", stats["files"])
 
         with r2:
-            st.metric("Files", stats["files"])
+            glass_card("Folders", stats["folders"])
 
         with r3:
-            st.metric("Folders", stats["folders"])
+            glass_card("Items", stats["total_items"])
 
         with r4:
-            st.metric("Shortcuts", stats["shortcuts"])
+            glass_card("Shortcuts", stats["shortcuts"])
 
         with r5:
-            st.metric("Large Files", stats["large_files"])
-        old_files_count = len(
-            get_old_files(
-                st.session_state.scan_entries
-            )
-        )
-
-        health = get_desktop_health(
-            stats,
-            old_files_count
-        )
-
-        st.subheader("❤️ Desktop Health")
-
-        st.success(health)
-
-        st.subheader("💡 Smart Suggestions")
-
-        suggestions = get_suggestions(stats)
-
-        for s in suggestions:
-            st.info(s)
-
-        st.subheader("🕒 Recent Files")
+            glass_card("Large Files", stats["large_files"])
 
         recent_files = get_recent_files(
             st.session_state.scan_entries
         )
 
-        if recent_files:
-            st.dataframe(
-                recent_files[:10],
-                use_container_width=True,
-                hide_index=True
-            )
-     elif page == "📁 Files":
+        st.subheader("🕒 Recent Files")
 
-        st.subheader("🕒 Old Files")
+        if recent_files:
+
+            st.dataframe(
+                recent_files,
+                use_container_width=True
+            )
 
         old_files = get_old_files(
             st.session_state.scan_entries
         )
+        st.subheader("❤️ Desktop Health")
 
-        if old_files:
-
-            st.dataframe(
-                old_files,
-                use_container_width=True,
-                hide_index=True
-            )
-
-        st.subheader("📁 Folder Size Analysis")
-
-        folder_sizes = get_folder_sizes(
-            scan_root
+        health_score, health_status = get_desktop_health(
+            stats,
+            len(old_files)
         )
 
-        if folder_sizes:
+        st.progress(
+            health_score/100
+        )
 
-            st.dataframe(
-                folder_sizes,
-                use_container_width=True,
-                hide_index=True
-            )
+        st.success(
+            f"{health_status} ({health_score}%)"
+        )
+        
+elif page == "📁 Files":
 
-        st.subheader("📑 Duplicate Files")
+    st.subheader("📁 Files")
 
-        duplicates = get_duplicates(
+    if st.session_state.scan_entries:
+
+        st.dataframe(
+            st.session_state.scan_entries[:rows_to_show],
+            use_container_width=True,
+            hide_index=True
+        )
+
+        recent_files = get_recent_files(
             st.session_state.scan_entries
         )
 
-    if duplicates:
+        st.subheader("🕒 Recent Files")
 
-        for name, files in duplicates.items():
+        if recent_files:
 
-            st.warning(
-                f"{name} appears {len(files)} times."
+            st.dataframe(
+                recent_files,
+                use_container_width=True,
+                hide_index=True
             )
-    elif page == "📊 Analytics":
 
-        st.subheader("📈 File Type Analytics")
+elif page == "📊 Analytics":
+
+    st.subheader("📈 Analytics")
+
+    if st.session_state.scan_entries:
 
         extension_counts = get_extension_counts(
             st.session_state.scan_entries
@@ -807,29 +831,58 @@ if st.session_state.scan_stats:
                 chart_data,
                 names="Extension",
                 values="Count",
-                hole=0.6
+                hole=0.65,
+                color_discrete_sequence=px.colors.sequential.Plasma
+            )
+
+            fig.update_layout(
+                paper_bgcolor="#0f172a",
+                plot_bgcolor="#0f172a",
+                font_color="white",
+                title="File Type Distribution"
             )
 
             st.plotly_chart(
                 fig,
                 use_container_width=True
             )
-            st.dataframe(
-                chart_data,
-                use_container_width=True,
-                hide_index=True
+
+        else:
+
+            st.info(
+                "No files found to analyze."
             )
-    elif page == "📋 Reports":
 
-        st.subheader("📋 Cleanup Report")
+        folder_sizes = get_folder_sizes(
+            scan_root
+        )
 
-        if st.session_state.cleanup_logs:
+        st.subheader("📁 Folder Sizes")
 
-            st.dataframe(
-                st.session_state.cleanup_logs,
-                use_container_width=True,
-                hide_index=True
-            )
+        fig = px.bar(
+            folder_sizes,
+            x="Folder",
+            y="Size MB",
+            color="Size MB"
+        )
+
+        st.plotly_chart(
+            fig,
+            use_container_width=True
+        )
+
+elif page == "📋 Reports":
+
+    st.subheader("📋 Cleanup Report")
+
+    if st.session_state.cleanup_logs:
+
+        st.dataframe(
+            st.session_state.cleanup_logs,
+            use_container_width=True,
+            hide_index=True
+        )
+
 
 # ----------------------------
 # Footer
@@ -838,7 +891,7 @@ st.markdown(
     f"""
     <div class="footer">
         Safe Preview Architecture | Python + Streamlit<br>
-        Smart Desktop Cleaner Pro | Version 1.3<br>
+        Smart Desk Cleaner Pro | Version 2.0<br>
         {datetime.now().strftime('%Y-%m-%d %H:%M')}
     </div>
     """,
