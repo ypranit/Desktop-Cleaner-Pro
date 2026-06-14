@@ -1,133 +1,57 @@
 # 🧹 Smart Desktop Cleaner Pro
 
-A modern desktop organization tool built with **Python** and **Streamlit**.
+A modern desktop organization tool built with **Python + Streamlit**.
 
-Designed with a **Safe Preview Architecture**, the application allows users to scan, analyze, and organize their desktop without risking accidental file movement.
+## 🚀 Live Demo
 
----
-
-## ✨ Features
-
-### 🔍 Desktop Scanner
-
-Scan the desktop and collect information about files and folders.
-
-### 👀 Safe Preview Mode
-
-Preview cleanup operations before moving files.
-
-### 📂 Auto Organization
-
-Organize files into categories automatically.
-
-### 💡 Smart Suggestions
-
-Receive recommendations based on desktop usage.
-
-### 📈 File Type Analytics
-
-Analyze file extensions and visualize them with charts.
-
-### 🕒 Old Files Detection
-
-Find files that have not been modified for more than 90 days.
-
-### 🔍 Search Files
-
-Search files instantly by filename.
-
-### 📁 Folder Size Analysis
-
-See which folders consume the most space.
-
-### ❤️ Desktop Health Score
-
-Quickly determine whether your desktop is healthy, moderately cluttered, or needs cleanup.
-
-### 📑 Duplicate Detection
-
-Detect duplicate filenames safely.
-
-### 📄 CSV Reports
-
-Export scan and cleanup reports.
+https://desktop-cleaner-pro-4s2wrnmudwagvejumssvws.streamlit.app/
 
 ---
 
-## 🏗 Architecture
+## Features
 
-```
-Scan
-↓
-Preview
-↓
-Review
-↓
-Organize
-```
-
-Safety always comes first.
+* 📊 Dashboard Analytics
+* 📁 File Explorer
+* 📈 Interactive Charts with Plotly
+* ❤️ Desktop Health Score
+* 🕒 Recent Files Detection
+* 📂 Folder Size Analysis
+* 📋 Cleanup Reports
+* 🔒 Safe Preview Mode
+* 🎨 Modern UI
 
 ---
 
-## 🛠 Built With
+## Tech Stack
 
 * Python
 * Streamlit
-* pathlib
-* shutil
-* datetime
-* csv
-* io
+* Plotly
+* Pandas
 
 ---
 
-## 📸 Screenshots
+## Installation
 
-Dashboard
-
-Desktop Analytics
-
-Smart Suggestions
-
-File Type Analytics
-
-Old Files
-
-Search Files
-
-Folder Size Analysis
-
-Duplicate Detection
-
-Cleanup Report
-
----
-
-## 🚀 Version
-
-Current Release:
-
-**Version 1.5**
-
----
-
-## Philosophy
-
-```
-Learn
-↓
-Build
-↓
-Debug
-↓
-Improve
-↓
-Ship
-↓
-Repeat
+```bash
+git clone https://github.com/YOUR_USERNAME/Desktop-Cleaner-Pro.git
+cd Desktop-Cleaner-Pro
+pip install -r requirements.txt
+streamlit run app.py
 ```
 
 ---
 
-Built with Python + Streamlit.
+## Screenshots
+
+(image.png)
+
+---
+
+## Version
+
+Current Version: **v2.0**
+
+---
+
+Built with ❤️ using Python and Streamlit.
